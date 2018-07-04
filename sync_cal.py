@@ -2,6 +2,8 @@ import ConfigParser
 from datetime import datetime, timedelta
 import calendar
 import phorest
+import gcal
+import gcal_sync
 
 
 def _load_config():
@@ -14,6 +16,7 @@ def _load_config():
         'business': cp.get('general', 'business'),
         'branch': cp.get('general', 'branch'),
         'staff_name': cp.get('general', 'staff_name'),
+        'calendar_id': cp.get('general', 'calendar_id'),
     }
 
 
@@ -29,21 +32,43 @@ if __name__ == '__main__':
 
     next_monday = _get_first_monday_before_today()
 
-    for w in range(1):
-        next_monday += timedelta(days=7 * w)
+    for _ in range(5):
+        next_monday += timedelta(days=7)
         next_sunday = next_monday + timedelta(days=6)
 
-        print next_monday.date(), '-', next_sunday.date()
+        try:
+            appts = phorest.get_appointments_by_date(
+                cfg['auth'], cfg['business'], cfg['branch'], cfg['staff_name'],
+                next_monday, next_sunday)
+        except Exception as e:
+            print 'Error', next_monday.date(), '-', next_sunday.date()
+            print '    ', str(e)
+            continue
 
-        appts = phorest.get_appointments_by_date(
-            cfg['auth'], cfg['business'], cfg['branch'], cfg['staff_name'],
-            next_monday, next_sunday)
-
+        events = gcal.service_events()
         for dt in sorted(appts.keys()):
-            print dt
-            for appt in appts[dt]:
-                import pprint
-                pprint.pprint(appt)
-            # TODO :    sync events to calendar for day
+            existing_events = gcal_sync.get_events_for_day(
+                events, cfg['calendar_id'], dt)
 
-            print '-' * 60
+            for appt in appts[dt]:
+                start_time = appt['start'].strftime('%H:%M')
+                end_time = appt['end'].strftime('%H:%M')
+                summary = '{}, {}'.format(appt['client'], appt['service'])
+
+                key = u'{}|{}|{}'.format(start_time, end_time, summary)
+                if key in existing_events:
+                    del existing_events[key]
+                    continue
+
+                description = '\n'.join(
+                    appt[k] for k in ('price', 'email', 'phone')
+                    if appt[k]
+                )
+
+                event = gcal.add_event(
+                    events, cfg['calendar_id'], summary, description,
+                    appt['start'], appt['end'])
+
+            if existing_events.keys():
+                for eventid in existing_events.values():
+                    gcal.delete_event(events, cfg['calendar_id'], eventid)
