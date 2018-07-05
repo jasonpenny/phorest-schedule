@@ -1,5 +1,6 @@
 import ConfigParser
 from datetime import datetime, timedelta
+import os
 import calendar
 import phorest
 import gcal
@@ -28,6 +29,8 @@ def _get_first_monday_before_today():
 
 
 if __name__ == '__main__':
+    debug = bool(os.environ.get('DEBUG'))
+
     cfg = _load_config()
 
     next_monday = _get_first_monday_before_today()
@@ -35,6 +38,9 @@ if __name__ == '__main__':
     for _ in range(5):
         next_monday += timedelta(days=7)
         next_sunday = next_monday + timedelta(days=6)
+
+        if debug:
+            print next_monday.date(), '-', next_sunday.date()
 
         try:
             appts = phorest.get_appointments_by_date(
@@ -57,6 +63,8 @@ if __name__ == '__main__':
 
                 key = u'{}|{}|{}'.format(start_time, end_time, summary)
                 if key in existing_events:
+                    if debug:
+                        print 'existing', key
                     del existing_events[key]
                     continue
 
@@ -65,10 +73,16 @@ if __name__ == '__main__':
                     if appt[k]
                 )
 
+                if debug:
+                    print 'adding', key
+
                 event = gcal.add_event(
                     events, cfg['calendar_id'], summary, description,
                     appt['start'], appt['end'])
 
             if existing_events.keys():
+                if debug:
+                    print existing_events.keys()
+
                 for eventid in existing_events.values():
                     gcal.delete_event(events, cfg['calendar_id'], eventid)
