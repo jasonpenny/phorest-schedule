@@ -33,7 +33,7 @@ if __name__ == '__main__':
 
     cfg = _load_config()
 
-    next_monday = _get_first_monday_before_today()
+    next_monday = _get_first_monday_before_today() - timedelta(days=7)
 
     for _ in range(5):
         next_monday += timedelta(days=7)
