@@ -46,10 +46,18 @@ if __name__ == '__main__':
             appts = phorest.get_appointments_by_date(
                 cfg['auth'], cfg['business'], cfg['branch'], cfg['staff_name'],
                 next_monday, next_sunday)
+            breaks = phorest.get_breaks(
+                cfg['auth'], cfg['business'], cfg['branch'], cfg['staff_name'],
+                next_monday, next_sunday)
         except Exception as e:
             print 'Error', next_monday.date(), '-', next_sunday.date()
             print '    ', str(e)
             continue
+
+        # merge breaks into appointments
+        if breaks:
+            for key, brk in breaks.items():
+                appts[key].extend(brk)
 
         events = gcal.service_events()
         for dt in sorted(appts.keys()):
@@ -59,7 +67,11 @@ if __name__ == '__main__':
             for appt in appts[dt]:
                 start_time = appt['start'].strftime('%H:%M')
                 end_time = appt['end'].strftime('%H:%M')
-                summary = '{}, {}'.format(appt['client'], appt['service'])
+
+                if appt['type'] == 'appointment':
+                    summary = '{}, {}'.format(appt['client'], appt['service'])
+                else:
+                    summary = appt['label']
 
                 key = u'{}|{}|{}'.format(start_time, end_time, summary)
                 if key in existing_events:
@@ -70,15 +82,19 @@ if __name__ == '__main__':
 
                 description = '\n'.join(
                     appt[k] for k in ('price', 'email', 'phone')
-                    if appt[k]
+                    if appt.get(k)
                 )
 
                 if debug:
                     print 'adding', key
 
+                colorId = None
+                if appt['type'] == 'break':
+                    colorId = 8
+
                 event = gcal.add_event(
                     events, cfg['calendar_id'], summary, description,
-                    appt['start'], appt['end'])
+                    appt['start'], appt['end'], colorId)
 
             if existing_events.keys():
                 if debug:

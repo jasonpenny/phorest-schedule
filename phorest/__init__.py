@@ -45,6 +45,7 @@ def get_appointments_by_date(auth, business, branch, staff_name, dtstart, dtend)
         ) + timedelta(minutes=service['gapTime'])
 
         appointment = {
+            'type': 'appointment',
             'start': apptstart,
             'end': apptend,
             'client': client['name'],
@@ -54,6 +55,66 @@ def get_appointments_by_date(auth, business, branch, staff_name, dtstart, dtend)
             'price': _get_price(appt, service),
         }
         result[apptstart.date()].append(appointment)
+
+    return result
+
+
+def get_breaks(auth, business, branch, staff_name, dtstart, dtend):
+    url = (
+        'https://prod-us.phorest.com/memento/rest/business/{}/branch/{}/staffBreak?max=2147483647&'
+        'start_time=%3E{}T04:00:00.000Z&start_time=%3C{}T04:00:00.000Z'
+        .format(
+            business,
+            branch,
+            dtstart.strftime('%Y-%m-%d'),
+            dtend.strftime('%Y-%m-%d')
+        )
+    )
+
+    r = requests.get(url, headers={'Authorization': auth})
+    doc = xmltodict.parse(r.content)
+
+    staffId = None
+    supports = doc['staffBreakList']['support']
+    if not isinstance(supports, list):
+        supports = [supports]
+    for support in supports:
+        typ = support.get('@xsi:type')
+
+        if not staffId and typ == 'StaffSupport':
+            if staff_name == support['firstName'] + ' ' + support['lastName']:
+                staffId = support['identity']['@id']
+                break
+
+    if not staffId:
+        return
+
+    UTC = pytz.timezone('UTC')
+    NY = pytz.timezone('America/New_York')
+
+    result = defaultdict(list)
+    for brk in doc['staffBreakList']['staffBreak']:
+        if staffId != brk.get('staffRef'):
+            continue
+
+        brkstart = (
+            datetime.strptime(brk['startTime'][:16], '%Y-%m-%dT%H:%M')
+            .replace(tzinfo=UTC)
+            .astimezone(NY)
+        )
+        brkend = (
+            datetime.strptime(brk['endTime'][:16], '%Y-%m-%dT%H:%M')
+            .replace(tzinfo=UTC)
+            .astimezone(NY)
+        )
+
+        staffbreak = {
+            'type': 'break',
+            'start': brkstart,
+            'end': brkend,
+            'label': brk['label'],
+        }
+        result[brkstart.date()].append(staffbreak)
 
     return result
 

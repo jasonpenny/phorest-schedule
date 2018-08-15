@@ -13,21 +13,26 @@ def service_events():
     return service.events()
 
 
-def add_event(events, calendarId, summary, description, startTime, endTime):
+def add_event(events, calendarId, summary, description, startTime, endTime, colorId):
+    body = {
+        "summary": summary,
+        "description": description,
+        "start": {
+            "dateTime": startTime.strftime('%Y-%m-%dT%H:%M:00'),
+            "timeZone": "America/New_York"
+        },
+        "end": {
+            "dateTime": endTime.strftime('%Y-%m-%dT%H:%M:00'),
+            "timeZone": "America/New_York"
+        }
+    }
+    if colorId:
+        body['colorId'] = colorId
+
     return events.insert(
         calendarId=calendarId,
-        body={
-            "summary": summary,
-            "description": description,
-            "start": {
-                "dateTime": startTime.strftime('%Y-%m-%dT%H:%M:00'),
-                "timeZone": "America/New_York"
-            },
-            "end": {
-                "dateTime": endTime.strftime('%Y-%m-%dT%H:%M:00'),
-                "timeZone": "America/New_York"
-            }
-        }).execute()
+        body=body
+    ).execute()
 
 
 def delete_event(events, calendarId, eventId):
