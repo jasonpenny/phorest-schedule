@@ -25,6 +25,7 @@ def get_appointments_by_date(auth, business, branch, staff_name, dtstart, dtend)
     UTC = pytz.timezone('UTC')
     NY = pytz.timezone('America/New_York')
 
+    added = set()
     result = defaultdict(list)
     for appt in doc['appointmentList']['appointment']:
         if staffId != appt.get('staffRef'):
@@ -54,6 +55,15 @@ def get_appointments_by_date(auth, business, branch, staff_name, dtstart, dtend)
             'service': service['name'],
             'price': _get_price(appt, service),
         }
+        appt_tpl = (
+            appointment['start'],
+            appointment['end'],
+            appointment['client'],
+            appointment['service'],
+        )
+        if appt_tpl in added:
+            continue
+        added.add(appt_tpl)
         result[apptstart.date()].append(appointment)
 
     return result
