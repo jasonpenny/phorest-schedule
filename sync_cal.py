@@ -69,7 +69,7 @@ if __name__ == '__main__':
                 end_time = appt['end'].strftime('%H:%M')
 
                 if appt['type'] == 'appointment':
-                    summary = '{}, {}'.format(appt['client'], appt['service'])
+                    summary = u'{}, {}'.format(appt['client'], appt['service'])
                 else:
                     summary = appt['label']
 
